@@ -10,7 +10,11 @@ from .operations import (
     is_message_processed,
     save_message,
     update_user_settings,
+    set_pending_image,
+    get_pending_image,
+    clear_pending_image,
 )
+
 
 __all__ = [
     "get_supabase_client",
@@ -22,4 +26,7 @@ __all__ = [
     "is_message_processed",
     "save_message",
     "delete_chat_history",
+    "set_pending_image",
+    "get_pending_image",
+    "clear_pending_image",
 ]

@@ -1,7 +1,7 @@
 """Pydantic models for database entities."""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -23,6 +23,14 @@ class UserSettings(BaseModel):
     reasoning_effort: Literal["low", "medium", "high"] = "medium"
 
 
+class ConversationState(BaseModel):
+    """Ephemeral state for the conversation flow."""
+    
+    user_id: int
+    pending_image_id: str | None = None
+    updated_at: datetime | None = None
+
+
 class ChatMessage(BaseModel):
     """A single message in the chat history."""
 
@@ -30,6 +38,7 @@ class ChatMessage(BaseModel):
     user_id: int
     role: Literal["user", "assistant"]
     content: str
+    image_data: str | None = None
     message_id: int | None = None
     created_at: datetime | None = None
 
@@ -39,6 +48,21 @@ class ChatHistory(BaseModel):
 
     messages: list[ChatMessage] = Field(default_factory=list)
 
-    def to_openai_format(self) -> list[dict[str, str]]:
+    def to_openai_format(self) -> list[dict[str, Any]]:
         """Convert to OpenAI API message format."""
-        return [{"role": msg.role, "content": msg.content} for msg in self.messages]
+        formatted_messages = []
+        for msg in self.messages:
+            if msg.image_data:
+                # Reconstruct multi-part message with vision
+                content = [
+                    {"type": "input_text", "text": msg.content},
+                    {
+                        "type": "input_image",
+                        "image_url": f"data:image/jpeg;base64,{msg.image_data}",
+                    },
+                ]
+                formatted_messages.append({"role": msg.role, "content": content})
+            else:
+                formatted_messages.append({"role": msg.role, "content": msg.content})
+        
+        return formatted_messages

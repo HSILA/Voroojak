@@ -36,9 +36,20 @@ CREATE TABLE IF NOT EXISTS chat_history (
     user_id BIGINT REFERENCES allowed_users(telegram_id) ON DELETE CASCADE,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
+    image_data TEXT,
     message_id BIGINT,
     created_at TIMESTAMP DEFAULT NOW(),
     CHECK (role IN ('user', 'assistant'))
+);
+
+-- =============================================================================
+-- Table: conversation_state
+-- Purpose: Store ephemeral state for conversation flow (e.g. pending images)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS conversation_state (
+    user_id BIGINT PRIMARY KEY REFERENCES allowed_users(telegram_id) ON DELETE CASCADE,
+    pending_image_id TEXT,
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- =============================================================================

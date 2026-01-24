@@ -1,5 +1,7 @@
 """Telegram bot command and message handlers."""
 
+import base64
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -11,6 +13,9 @@ from src.db import (
     is_message_processed,
     save_message,
     update_user_settings,
+    set_pending_image,
+    get_pending_image,
+    clear_pending_image,
 )
 from src.services.openai_service import generate_response
 from src.utils import markdown_to_telegram_html
@@ -200,14 +205,42 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Get user settings
         settings = get_user_settings(user_id)
         
+        image_base64 = None
+        
+        # Check for pending detached image
+        image_base64 = None
+        
+        # Check for pending detached image
+        pending_image_id = get_pending_image(user_id)
+        if pending_image_id:
+            try:
+                # Retrieve and download the pending image
+                file = await context.bot.get_file(pending_image_id)
+                photo_bytes = await file.download_as_bytearray()
+                image_base64 = base64.b64encode(photo_bytes).decode("utf-8")
+                
+                # Clear pending image state
+                clear_pending_image(user_id)
+                
+            except Exception as e:
+                print(f"Failed to retrieve pending image: {e}")
+                # Log error but continue with text only
+        
         # Get history BEFORE saving new message to avoid context duplication
         history = get_chat_history(user_id, limit=20)
         
         # Save user message immediately to mark as processed
-        save_message(user_id, "user", user_message, message_id=message_id)
+        # If we attached an image, mark it in the text for history context
+        log_content = f"[📷 Attached Image] {user_message}" if image_base64 else user_message
+        save_message(user_id, "user", log_content, message_id=message_id, image_data=image_base64)
         
         # Generate AI response (Now in standard Markdown)
-        ai_response = generate_response(history, user_message, settings)
+        ai_response = generate_response(
+            history, 
+            user_message, 
+            settings, 
+            image_base64=image_base64
+        )
         
         # Save assistant response
         save_message(user_id, "assistant", ai_response)
@@ -229,3 +262,115 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"❌ Error generating response:\n\n<code>{str(e)}</code>",
             parse_mode="HTML"
         )
+
+
+# Static prompt when user sends image without caption
+IMAGE_WITHOUT_CAPTION_PROMPT = (
+    "📷 I received your image!\n\n"
+    "Please send your question about this image in the next message.\n\n"
+    "💡 <b>Tip:</b> When sending an image, add a caption with your question for best results."
+)
+
+
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle photo messages - process images with optional caption for AI analysis."""
+    user_id = update.effective_user.id
+    
+    # Check access
+    if not check_user_access(user_id):
+        await update.message.reply_text(
+            "⛔️ You don't have access to this bot."
+        )
+        return
+    
+    # Get caption (question about the image)
+    caption = update.message.caption
+    
+    # If no caption, save file_id and prompt user
+    if not caption:
+        # Get pending image file ID
+        file_id = update.message.photo[-1].file_id
+        
+        # Save to user settings so we remember it for the next text message
+        set_pending_image(user_id, file_id)
+        
+        await update.message.reply_text(
+            IMAGE_WITHOUT_CAPTION_PROMPT,
+            parse_mode="HTML"
+        )
+        return
+    
+    # Send typing indicator
+    await update.message.chat.send_action("typing")
+    
+    try:
+        # Check for duplicate messages (idempotency)
+        message_id = update.message.message_id
+        if is_message_processed(user_id, message_id):
+            print(f"Skipping duplicate photo message {message_id} for user {user_id}")
+            return
+        
+        # Clear any pending image since a new one is provided
+        clear_pending_image(user_id)
+        
+        # Get the highest resolution photo
+        photo = update.message.photo[-1]
+        
+        # Download photo to memory
+        file = await photo.get_file()
+        photo_bytes = await file.download_as_bytearray()
+        
+        # Convert to base64
+        image_base64 = base64.b64encode(photo_bytes).decode("utf-8")
+        
+        # Get user settings
+        settings = get_user_settings(user_id)
+        
+        # Get history BEFORE saving new message
+        history = get_chat_history(user_id, limit=20)
+        
+        # Save user message (caption only, image is ephemeral)
+        save_message(user_id, "user", f"[📷 Image] {caption}", message_id=message_id, image_data=image_base64)
+        
+        # Generate AI response with image
+        ai_response = generate_response(
+            history,
+            caption,
+            settings,
+            image_base64=image_base64
+        )
+        
+        # Save assistant response
+        save_message(user_id, "assistant", ai_response)
+        
+        # Convert Markdown -> Telegram HTML
+        html_response = markdown_to_telegram_html(ai_response)
+        
+        # Send response
+        try:
+            await update.message.reply_text(html_response, parse_mode="HTML")
+        except Exception as e:
+            print(f"HTML send failed: {e}")
+            await update.message.reply_text(ai_response)
+    
+    except Exception as e:
+        await update.message.reply_text(
+            f"❌ Error processing image:\n\n<code>{str(e)}</code>",
+            parse_mode="HTML"
+        )
+
+
+async def handle_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle unsupported file types (documents, audio, video, etc.)."""
+    user_id = update.effective_user.id
+    
+    if not check_user_access(user_id):
+        return
+
+    await update.message.reply_text(
+        "📂 <b>File Format Not Supported</b>\n\n"
+        "I currently only support <b>Images</b> (sent as photos) and <b>Text</b>.\n"
+        "Sending files, documents, or high-quality uncompressed images is not supported yet.\n\n"
+        "Please send your image as a quick photo 🖼️.",
+        parse_mode="HTML"
+    )

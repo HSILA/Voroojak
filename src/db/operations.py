@@ -1,7 +1,13 @@
 """Database operations using Supabase client."""
 
+from datetime import datetime, timedelta, timezone
+from typing import Literal
+
 from .client import get_supabase_client
 from .models import AllowedUser, ChatHistory, ChatMessage, UserSettings
+
+# Time in minutes before a pending image is considered "stale" and ignored
+PENDING_IMAGE_TIMEOUT_MINUTES = 60
 
 
 def check_user_access(telegram_id: int) -> bool:
@@ -56,6 +62,7 @@ def get_user_settings(user_id: int) -> UserSettings:
         return UserSettings(**response.data[0])
 
     # Create default settings
+    # Create default settings
     default_settings = {"user_id": user_id, "selected_model": "gpt-5-mini", "reasoning_effort": "medium"}
     response = client.table("user_settings").insert(default_settings).execute()
     return UserSettings(**response.data[0])
@@ -85,6 +92,68 @@ def update_user_settings(
         client.table("user_settings").update(updates).eq("user_id", user_id).execute()
     )
     return UserSettings(**response.data[0])
+
+
+def set_pending_image(user_id: int, file_id: str) -> None:
+    """Set a pending image for the user's conversation state."""
+    client = get_supabase_client()
+    
+    # Upsert state (insert or update)
+    data = {"user_id": user_id, "pending_image_id": file_id, "updated_at": "now()"}
+    client.table("conversation_state").upsert(data).execute()
+
+
+def get_pending_image(user_id: int) -> str | None:
+    """Get pending image ID if exists and is recent (< 60 mins)."""
+    client = get_supabase_client()
+    
+    response = (
+        client.table("conversation_state")
+        .select("pending_image_id, updated_at")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    
+    if not response.data:
+        return None
+    
+    row = response.data[0]
+    pending_id = row.get("pending_image_id")
+    updated_at_str = row.get("updated_at")
+    
+    if not pending_id or not updated_at_str:
+        return None
+        
+    # Check for expiration
+    try:
+        # Supabase returns ISO strings like '2023-10-27T10:00:00+0000' or '2023-10-27T10:00:00'
+        # We handle standard ISO format replacement Z -> +00:00 just in case
+        updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
+        
+        # Fix: Ensure updated_at is timezone-aware (UTC) if it comes back naive
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
+        
+        # Ensure we compare timezone-aware datetimes
+        time_diff = datetime.now(timezone.utc) - updated_at
+        
+        if time_diff > timedelta(minutes=PENDING_IMAGE_TIMEOUT_MINUTES):
+            # Too old! Clean it up and return None
+            clear_pending_image(user_id)
+            return None
+            
+    except ValueError:
+        # If date parsing fails, assume valid (or safe fail to None)?
+        # Let's fail safe -> return None to avoid weird bugs
+        return None
+        
+    return pending_id
+
+
+def clear_pending_image(user_id: int) -> None:
+    """Clear the pending image state."""
+    client = get_supabase_client()
+    client.table("conversation_state").delete().eq("user_id", user_id).execute()
 
 
 def get_chat_history(user_id: int, limit: int = 20) -> ChatHistory:
@@ -131,7 +200,13 @@ def is_message_processed(user_id: int, message_id: int) -> bool:
     return len(response.data) > 0
 
 
-def save_message(user_id: int, role: str, content: str, message_id: int | None = None) -> ChatMessage:
+def save_message(
+    user_id: int, 
+    role: str, 
+    content: str, 
+    message_id: int | None = None,
+    image_data: str | None = None
+) -> ChatMessage:
     """Save a message to chat history.
     
     Args:
@@ -139,6 +214,7 @@ def save_message(user_id: int, role: str, content: str, message_id: int | None =
         role: Message role ('user' or 'assistant').
         content: Message text content.
         message_id: Optional Telegram message ID for deduplication (only for user messages).
+        image_data: Optional Base64 image data to persist.
         
     Returns:
         Saved message record.
@@ -147,6 +223,8 @@ def save_message(user_id: int, role: str, content: str, message_id: int | None =
     data = {"user_id": user_id, "role": role, "content": content}
     if message_id is not None:
         data["message_id"] = message_id
+    if image_data is not None:
+        data["image_data"] = image_data
         
     response = client.table("chat_history").insert(data).execute()
     return ChatMessage(**response.data[0])

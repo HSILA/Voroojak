@@ -13,6 +13,8 @@ from telegram.ext import (
 from src.bot.handlers import (
     handle_callback_query,
     handle_message,
+    handle_photo,
+    handle_unsupported,
     newchat_command,
     settings_command,
     start_command,
@@ -30,6 +32,8 @@ telegram_app.add_handler(CommandHandler("start", start_command))
 telegram_app.add_handler(CommandHandler("settings", settings_command))
 telegram_app.add_handler(CommandHandler("newchat", newchat_command))
 telegram_app.add_handler(CallbackQueryHandler(handle_callback_query))
+telegram_app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+telegram_app.add_handler(MessageHandler(filters.Document.ALL | filters.AUDIO | filters.VIDEO, handle_unsupported))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 

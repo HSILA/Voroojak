@@ -19,6 +19,7 @@ def generate_response(
     history: ChatHistory,
     user_message: str,
     user_settings: UserSettings,
+    image_base64: str | None = None,
 ) -> str:
     """Generate a response from OpenAI based on conversation history.
     
@@ -26,13 +27,28 @@ def generate_response(
         history: Previous conversation context.
         user_message: New message from the user.
         user_settings: User's model and reasoning preferences.
+        image_base64: Optional base64-encoded image data (JPEG format).
         
     Returns:
         Generated response text.
     """
     # Build input messages array (history + new message)
     messages = history.to_openai_format()
-    messages.append({"role": "user", "content": user_message})
+    
+    # Build user message content (with optional image)
+    if image_base64:
+        # Vision-enabled message with image
+        user_content = [
+            {"type": "input_text", "text": user_message},
+            {
+                "type": "input_image",
+                "image_url": f"data:image/jpeg;base64,{image_base64}",
+            },
+        ]
+        messages.append({"role": "user", "content": user_content})
+    else:
+        # Standard text-only message
+        messages.append({"role": "user", "content": user_message})
     
     # Get current date for temporal context
     from datetime import datetime
