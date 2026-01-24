@@ -7,6 +7,7 @@ from .operations import (
     delete_chat_history,
     get_chat_history,
     get_user_settings,
+    is_message_processed,
     save_message,
     update_user_settings,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "get_user_settings",
     "update_user_settings",
     "get_chat_history",
+    "is_message_processed",
     "save_message",
     "delete_chat_history",
 ]

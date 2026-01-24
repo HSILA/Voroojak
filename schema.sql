@@ -36,16 +36,22 @@ CREATE TABLE IF NOT EXISTS chat_history (
     user_id BIGINT REFERENCES allowed_users(telegram_id) ON DELETE CASCADE,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
+    message_id BIGINT,
     created_at TIMESTAMP DEFAULT NOW(),
     CHECK (role IN ('user', 'assistant'))
 );
 
 -- =============================================================================
--- Indexes for Performance
+-- Indexes for Performance & Deduplication
 -- =============================================================================
 CREATE INDEX IF NOT EXISTS idx_chat_history_user_id ON chat_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_history_created_at ON chat_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_chat_history_user_created ON chat_history(user_id, created_at);
+
+-- Unique index to prevent duplicate message processing from Telegram retries
+CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_history_user_message_id 
+ON chat_history(user_id, message_id) 
+WHERE message_id IS NOT NULL;
 
 -- =============================================================================
 -- Sample Data: Add yourself as the first user

@@ -7,9 +7,18 @@ A serverless Telegram AI bot providing a power-user interface for OpenAI models 
 - **Runtime:** Python 3.10+
 - **Framework:** FastAPI
 - **Database:** Supabase (PostgreSQL)
-- **AI:** OpenAI (GPT-4o, o3-mini)
+- **AI:** OpenAI (GPT-5.2, GPT-5 Mini, GPT-4.1)
 - **Deployment:** Vercel (Serverless)
 - **Bot:** python-telegram-bot (Webhooks)
+
+## Features
+
+✨ **Beautiful UI** - Persistent tile buttons for easy access  
+🤖 **Smart Model Selection** - Switch between GPT-5.2, GPT-5 Mini, and GPT-4.1  
+🧠 **Reasoning Control** - Adjust reasoning effort for supported models  
+💾 **Session Persistence** - Chat history saved in Supabase  
+🔒 **Access Control** - Whitelist-based user management  
+⚡ **Serverless** - Zero maintenance, auto-scaling
 
 ## Setup
 
@@ -74,9 +83,12 @@ Voroojak/
 
 ## Commands
 
-- `/start` - Initialize bot
+- `/start` - Initialize bot and show tile buttons
 - `/newchat` - Clear conversation history
 - `/settings` - Configure model & reasoning
+
+**Or use the beautiful tile buttons at the bottom:**  
+`⚙️ Settings` | `✨ New Chat Session`
 
 ## License
 

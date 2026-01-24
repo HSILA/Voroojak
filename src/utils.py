@@ -1,0 +1,52 @@
+import markdown
+import re
+
+def markdown_to_telegram_html(text: str) -> str:
+    """
+    Convert standard Markdown text to Telegram-supported HTML.
+    
+    Telegram supports a specific subset of HTML tags:
+    <b>, <i>, <u>, <s>, <a>, <code>, <pre>
+    
+    Standard Python-Markdown outputs:
+    <strong>, <em>, <p>, <ul>, <li>, etc.
+    
+    This function bridges the gap.
+    """
+    # 1. Convert Markdown to HTML
+    html = markdown.markdown(text)
+    
+    # 2. Replace incompatible tags with Telegram supported ones
+    html = html.replace("<strong>", "<b>").replace("</strong>", "</b>")
+    html = html.replace("<em>", "<i>").replace("</em>", "</i>")
+    
+    # 3. Strip block-level tags that Telegram doesn't support
+    
+    # Remove <p> tags but add newlines for spacing
+    html = html.replace("<p>", "").replace("</p>", "\n\n")
+    
+    # Clean up excessive newlines created by <p> removal inside lists or elsewhere
+    html = re.sub(r"\n\s*\n", "\n\n", html)
+
+    # Convert list items to bullet points
+    # Regex to handle potential whitespace or newlines inside <li>
+    html = re.sub(r"<li>\s*", "• ", html)
+    html = html.replace("</li>", "\n")
+    html = html.replace("<ul>", "").replace("</ul>", "\n")
+    html = html.replace("<ol>", "").replace("</ol>", "\n")
+    
+    # Remove <h1>...<h6> tags, make them bold
+    for i in range(1, 7):
+        html = html.replace(f"<h{i}>", "<b>").replace(f"</h{i}>", "</b>\n\n")
+
+    # 4. Clean up any other unsupported tags
+    # Remove <br> variations (Telegram uses newlines) and <hr>
+    html = re.sub(r"<br\s*/?>", "\n", html)
+    html = html.replace("<hr>", "\n---\n")
+    
+    # 5. Handle pre-formatted code blocks (markdown puts <pre><code>...</code></pre>)
+    # Telegram wants <pre>...</pre>.
+    # Python-Markdown does <pre><code>...</code></pre>.
+
+    
+    return html.strip()

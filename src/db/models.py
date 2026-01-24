@@ -30,6 +30,7 @@ class ChatMessage(BaseModel):
     user_id: int
     role: Literal["user", "assistant"]
     content: str
+    message_id: int | None = None
     created_at: datetime | None = None
 
 

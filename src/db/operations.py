@@ -110,19 +110,44 @@ def get_chat_history(user_id: int, limit: int = 20) -> ChatHistory:
     return ChatHistory(messages=messages)
 
 
-def save_message(user_id: int, role: str, content: str) -> ChatMessage:
+def is_message_processed(user_id: int, message_id: int) -> bool:
+    """Check if a message has already been processed.
+    
+    Args:
+        user_id: Telegram user ID.
+        message_id: Telegram message ID.
+        
+    Returns:
+        True if message exists, False otherwise.
+    """
+    client = get_supabase_client()
+    response = (
+        client.table("chat_history")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("message_id", message_id)
+        .execute()
+    )
+    return len(response.data) > 0
+
+
+def save_message(user_id: int, role: str, content: str, message_id: int | None = None) -> ChatMessage:
     """Save a message to chat history.
     
     Args:
         user_id: Telegram user ID.
         role: Message role ('user' or 'assistant').
         content: Message text content.
+        message_id: Optional Telegram message ID for deduplication (only for user messages).
         
     Returns:
         Saved message record.
     """
     client = get_supabase_client()
     data = {"user_id": user_id, "role": role, "content": content}
+    if message_id is not None:
+        data["message_id"] = message_id
+        
     response = client.table("chat_history").insert(data).execute()
     return ChatMessage(**response.data[0])
 
