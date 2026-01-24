@@ -42,7 +42,7 @@ cp .env.example .env
 ### 3. Set Up Database
 
 1. Create a Supabase project at [supabase.com](https://supabase.com)
-2. Copy the SQL from `scripts/setup_database.py` and run it in the SQL Editor
+2. Run the SQL from [`schema.sql`](./schema.sql) in your Supabase SQL Editor
 3. Add your Telegram ID to the whitelist:
    ```sql
    INSERT INTO allowed_users (telegram_id, username) 
@@ -58,6 +58,8 @@ cp .env.example .env
 ### 5. Deploy to Vercel
 
 ```bash
+vercel --prod
+# or
 bun x vercel --prod
 ```
 
@@ -72,14 +74,23 @@ curl -X POST "https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook?url=https://yo
 ```
 Voroojak/
 ├── api/                    # Vercel serverless functions
+├── docs/                   # Documentation
 ├── src/
 │   ├── bot/               # Telegram handlers
 │   ├── db/                # Database operations
 │   ├── services/          # External integrations
 │   └── config.py          # Settings
 ├── scripts/               # Setup utilities
+├── schema.sql             # Database schema
 └── pyproject.toml         # Dependencies
 ```
+
+## Documentation
+
+More detailed information can be found in the `docs` folder:
+- [Deployment Guide](./docs/DEPLOYMENT.md)
+- [Implementation Details](./docs/IMPLEMENTATION.md)
+- [Tile Buttons UI](./docs/TILE_BUTTONS.md)
 
 ## Commands
 

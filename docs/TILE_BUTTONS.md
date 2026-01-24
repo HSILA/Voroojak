@@ -15,7 +15,7 @@ When you start the bot with `/start`, beautiful tile buttons appear at the botto
 ├─────────────────────────────────────┤
 │  Type a message...            [🎤]  │
 ├─────────────────────────────────────┤
-│  ⚙️ Settings      │  🗑️ New Chat   │  <- These are persistent tile buttons!
+│  ⚙️ Settings      │ ✨ New Chat Session │  <- These are persistent tile buttons!
 └─────────────────────────────────────┘
 ```
 
@@ -30,7 +30,7 @@ When you start the bot with `/start`, beautiful tile buttons appear at the botto
 **Example:**
 ```
 ┌─────────────────────────────┐
-│  ⚙️ Settings  │ 🗑️ New Chat │  <- Always visible
+│  ⚙️ Settings  │ ✨ New Chat Session │  <- Always visible
 └─────────────────────────────┘
 ```
 
@@ -75,7 +75,7 @@ Tile buttons still visible at bottom!
 
 **Tile Buttons (Always visible):**
 - `⚙️ Settings` → Opens settings with inline buttons
-- `🗑️ New Chat` → Shows confirmation with inline buttons
+- `✨ New Chat Session` → Shows confirmation with inline buttons
 
 **Inline Buttons (Context-specific):**
 - Model selection: `GPT-5.2 Chat`, `GPT-5 Mini`, `GPT-4.1`
@@ -91,7 +91,7 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         [
             KeyboardButton("⚙️ Settings"),
-            KeyboardButton("🗑️ New Chat"),
+            KeyboardButton("✨ New Chat Session"),
         ],
         [
             KeyboardButton("📊 Stats"),        # Add a new row
@@ -116,7 +116,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if user_message == "⚙️ Settings":
         await settings_command(update, context)
         return
-    elif user_message == "🗑️ New Chat":
+    elif user_message == "✨ New Chat Session":
         await newchat_command(update, context)
         return
     elif user_message == "📊 Stats":          # New handler
@@ -168,8 +168,7 @@ Good emoji choices:
 ┌─────────────────────────────┐
 │  ✓ GPT-5.2 Chat │ GPT-5 Mini│
 │  GPT-4.1                    │
-│  ─── Reasoning Level ───    │
-│  🔵 Low │ ✓ 🟢 Med │ 🔴 High│
+│ 🔵 Low │ ✓ 🟢 Med │ 🔴 High│
 └─────────────────────────────┘
 ```
 
@@ -181,4 +180,3 @@ Good emoji choices:
 └─────────────────────────────┘
 ```
 
-Perfect combination of **always-visible actions** and **context-specific choices**! 🎯

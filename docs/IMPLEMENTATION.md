@@ -5,7 +5,7 @@
 ### **1. Beautiful Tile Buttons (Reply Keyboard)**
 Persistent buttons at the bottom of the chat:
 - ⚙️ **Settings** - Opens model & reasoning configuration
-- 🗑️ **New Chat** - Clears conversation history
+- ✨ **New Chat Session** - Clears conversation history
 
 These stay visible and are always accessible!
 
@@ -50,6 +50,10 @@ Three models with intelligent reasoning support:
 Voroojak/
 ├── api/
 │   └── webhook.py              # Vercel serverless endpoint
+├── docs/                   # Documentation files
+│   ├── DEPLOYMENT.md
+│   ├── IMPLEMENTATION.md
+│   └── TILE_BUTTONS.md
 ├── src/
 │   ├── bot/
 │   │   ├── handlers.py         # Commands, buttons, AI routing
@@ -65,9 +69,6 @@ Voroojak/
 ├── pyproject.toml              # UV dependencies
 ├── vercel.json                 # Deployment config
 ├── .env                        # Your credentials
-├── DEPLOYMENT.md               # Deploy guide
-├── TILE_BUTTONS.md             # Button UI guide
-├── TELEGRAM_MENU.md            # Menu setup guide
 └── README.md                   # Main documentation
 ```
 
@@ -188,14 +189,5 @@ Want to add more features? Here are ideas:
    - Analytics dashboard
 
 ---
-
-## ✅ You're Ready!
-
-Everything is implemented and ready to deploy. The bot has:
-- ✅ Beautiful tile buttons
-- ✅ Smart reasoning detection
-- ✅ Complete database integration
-- ✅ Serverless architecture
-- ✅ Production-ready code
 
 **Deploy and enjoy your AI assistant!** 🚀
