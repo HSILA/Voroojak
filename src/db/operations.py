@@ -156,7 +156,7 @@ def clear_pending_image(user_id: int) -> None:
     client.table("conversation_state").delete().eq("user_id", user_id).execute()
 
 
-def get_chat_history(user_id: int, limit: int = 20) -> ChatHistory:
+def get_chat_history(user_id: int, limit: int = 30) -> ChatHistory:
     """Retrieve recent chat history for context.
     
     Args:
@@ -171,11 +171,13 @@ def get_chat_history(user_id: int, limit: int = 20) -> ChatHistory:
         client.table("chat_history")
         .select("*")
         .eq("user_id", user_id)
-        .order("created_at", desc=False)
+        .order("created_at", desc=True)
         .limit(limit)
         .execute()
     )
-    messages = [ChatMessage(**msg) for msg in response.data]
+    # Reverse to restore chronological order (oldest to newest)
+    history_data = list(reversed(response.data))
+    messages = [ChatMessage(**msg) for msg in history_data]
     return ChatHistory(messages=messages)
 
 

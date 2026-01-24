@@ -227,7 +227,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 # Log error but continue with text only
         
         # Get history BEFORE saving new message to avoid context duplication
-        history = get_chat_history(user_id, limit=20)
+        history = get_chat_history(user_id, limit=30)
         
         # Save user message immediately to mark as processed
         # If we attached an image, mark it in the text for history context
@@ -327,7 +327,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         settings = get_user_settings(user_id)
         
         # Get history BEFORE saving new message
-        history = get_chat_history(user_id, limit=20)
+        history = get_chat_history(user_id, limit=30)
         
         # Save user message (caption only, image is ephemeral)
         save_message(user_id, "user", f"[📷 Image] {caption}", message_id=message_id, image_data=image_base64)
@@ -369,7 +369,7 @@ async def handle_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await update.message.reply_text(
         "📂 <b>File Format Not Supported</b>\n\n"
-        "I currently only support <b>Images</b> (sent as photos) and <b>Text</b>.\n"
+        "I currently only support <b>Images</b> (sent as÷ photos) and <b>Text</b>.\n"
         "Sending files, documents, or high-quality uncompressed images is not supported yet.\n\n"
         "Please send your image as a quick photo 🖼️.",
         parse_mode="HTML"
