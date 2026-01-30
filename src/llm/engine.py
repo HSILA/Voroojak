@@ -57,52 +57,27 @@ class LLMEngine:
         model = user_settings.selected_model
         reasoning_effort = user_settings.reasoning_effort if model in REASONING_MODELS else None
         
-        # 3. Attempt Execution
-        try:
-            # Primary Path: Responses API
-            # We prefer this because it supports the native 'web_search' tool and 'input' format
+        # 3. Attempt Execution with Auto-Downgrade
+        def _try_run(effort):
             return self._responses_backend.generate(
                 model=model,
                 input_messages=messages_responses_fmt,
                 instructions=instructions,
-                reasoning_effort=reasoning_effort,
+                reasoning_effort=effort,
                 enable_web_search=(model in WEB_SEARCH_MODELS)
             )
 
-        except Exception as e:
-            print(f"⚠️ Responses API failed ({str(e)}). Fallback to Chat Completions...")
-            return self._fallback_generation(
-                model=model,
-                messages_responses_fmt=messages_responses_fmt,
-                instructions=instructions,
-                reasoning_effort=reasoning_effort
-            )
-
-    def _fallback_generation(
-        self,
-        model: str,
-        messages_responses_fmt: list,
-        instructions: str,
-        reasoning_effort: str | None
-    ) -> str:
-        """Execute fallback using Standard Chat Completions API."""
-        
-        # Convert messages to standard format
-        messages_standard = to_chat_completion_format(messages_responses_fmt)
-        
-        # Prepend system instruction as a message
-        full_messages = [{"role": "system", "content": instructions}] + messages_standard
-        
         try:
-            return self._chat_backend.generate(
-                model=model,
-                messages=full_messages,
-                reasoning_effort=reasoning_effort,
-                supports_reasoning=(model in REASONING_MODELS)
-            )
+            return _try_run(reasoning_effort)
         except Exception as e:
-            # Ultimate failure (e.g. invalid model for chat completions or network error)
-            return f"❌ System Error: Both primary and fallback generation failed.\nDetails: {str(e)}"
+            # Handle the specific High > Medium downgrade
+            err_str = str(e).lower()
+            if reasoning_effort == "high" and "reasoning_effort" in err_str and ("unsupported value" in err_str or "unsupported_value" in err_str):
+                print(f"High reasoning rejected. Retrying with medium...")
+                return _try_run("medium") + "\n\n_(Note: Reasoning auto-adjusted to 'medium')_"
+            
+            # Genuine System Error
+            return f"System Error: {str(e)}"
     
     def generate_simple(self, prompt: str, model: str = "gpt-4o-mini") -> str:
         """Simple generation helper for internal tasks (e.g. titling)."""
