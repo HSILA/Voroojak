@@ -1,4 +1,3 @@
-"""Database operations using Supabase client."""
 
 from datetime import datetime, timedelta, timezone
 from typing import Literal

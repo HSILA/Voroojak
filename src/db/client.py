@@ -1,4 +1,3 @@
-"""Supabase client initialization."""
 
 from functools import lru_cache
 

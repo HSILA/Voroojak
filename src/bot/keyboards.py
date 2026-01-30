@@ -1,4 +1,3 @@
-"""Inline keyboard builders for Telegram bot."""
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 

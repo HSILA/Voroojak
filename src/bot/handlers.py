@@ -1,4 +1,3 @@
-"""Telegram bot command and message handlers."""
 
 import base64
 

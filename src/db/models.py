@@ -1,4 +1,3 @@
-"""Pydantic models for database entities."""
 
 from datetime import datetime
 from typing import Literal, Any
@@ -47,22 +46,3 @@ class ChatHistory(BaseModel):
     """Collection of messages for context."""
 
     messages: list[ChatMessage] = Field(default_factory=list)
-
-    def to_openai_format(self) -> list[dict[str, Any]]:
-        """Convert to OpenAI API message format."""
-        formatted_messages = []
-        for msg in self.messages:
-            if msg.image_data:
-                # Reconstruct multi-part message with vision
-                content = [
-                    {"type": "input_text", "text": msg.content},
-                    {
-                        "type": "input_image",
-                        "image_url": f"data:image/jpeg;base64,{msg.image_data}",
-                    },
-                ]
-                formatted_messages.append({"role": msg.role, "content": content})
-            else:
-                formatted_messages.append({"role": msg.role, "content": msg.content})
-        
-        return formatted_messages

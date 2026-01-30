@@ -1,4 +1,3 @@
-"""Database layer using Supabase."""
 
 from .client import get_supabase_client
 from .operations import (
