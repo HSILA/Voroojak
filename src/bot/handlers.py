@@ -118,14 +118,24 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     
     elif data.startswith("model:"):
         model = data.split(":")[1]
-        update_user_settings(user_id, selected_model=model)
+        
+        # Validation: gpt-5.2-chat-latest does not support "high" reasoning
+        # If user switches to this model while on "high", auto-downgrade to "medium"
+        current_settings = get_user_settings(user_id)
+        msg_extra = ""
+        
+        if model == "gpt-5.2-chat-latest" and current_settings.reasoning_effort == "high":
+            update_user_settings(user_id, selected_model=model, reasoning_effort="medium")
+            msg_extra = "\n⚠️ <i>Reasoning set to medium (High not supported)</i>"
+        else:
+            update_user_settings(user_id, selected_model=model)
         
         # Refresh keyboard & text
         settings = get_user_settings(user_id)
         keyboard = build_settings_keyboard(settings.selected_model, settings.reasoning_effort)
         
         await query.edit_message_text(
-            f"✅ Model changed to <b>{model}</b>\n\n"
+            f"✅ Model changed to <b>{model}</b>{msg_extra}\n\n"
             "⚙️ <b>Settings</b>\n"
             f"🤖 Model: <code>{settings.selected_model}</code>\n"
             f"🧠 Reasoning: <code>{settings.reasoning_effort}</code>",
@@ -135,9 +145,12 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     
     elif data.startswith("reasoning:"):
         level = data.split(":")[1]
+        settings = get_user_settings(user_id)
+        
         update_user_settings(user_id, reasoning_effort=level)
         
         # Refresh keyboard
+        # Re-fetch settings after update
         settings = get_user_settings(user_id)
         keyboard = build_settings_keyboard(settings.selected_model, settings.reasoning_effort)
         
@@ -245,16 +258,63 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         save_message(user_id, "assistant", ai_response)
         
         # Convert Markdown -> Telegram HTML
-        # This handles **bold**, [links], list items, etc. reliably
         html_response = markdown_to_telegram_html(ai_response)
         
-        # Send response with HTML parse mode
-        try:
-            await update.message.reply_text(html_response, parse_mode="HTML")
-        except Exception as e:
-            # If conversion or parsing fails (edge case), fallback to plain text
-            print(f"HTML send failed: {e}")
-            await update.message.reply_text(ai_response) # Send raw text
+        # Helper to send message (handles retry/fallback)
+        async def _send_chunk(text_chunk, as_html=True):
+            try:
+                if as_html:
+                    await update.message.reply_text(markdown_to_telegram_html(text_chunk), parse_mode="HTML")
+                else:
+                    await update.message.reply_text(text_chunk)
+            except Exception as e:
+                # If HTML fails or other error, fallback to plain text
+                print(f"Chunk send failed (HTML={as_html}): {e}")
+                if as_html:
+                    # Retry as plain text
+                    await update.message.reply_text(text_chunk)
+
+        # Check length (Telegram limit is 4096, using 4000 for safety)
+        if len(html_response) <= 4000:
+            try:
+                await update.message.reply_text(html_response, parse_mode="HTML")
+            except Exception as e:
+                print(f"HTML send failed: {e}")
+                await update.message.reply_text(ai_response)
+        else:
+            # Message too long: Split standard Markdown by paragraphs to preserve formatting safety
+            # We split the SOURCE markdown (ai_response), then convert chunks to HTML
+            chunks = []
+            current_chunk = ""
+            
+            # Split by double newline to respect paragraphs
+            paragraphs = ai_response.split("\n\n")
+            
+            for p in paragraphs:
+                # +2 for the double newline we removed
+                if len(current_chunk) + len(p) + 2 < 4000:
+                    current_chunk += p + "\n\n"
+                else:
+                    # Current chunk full, append to list
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                    
+                    # If single paragraph is HUGE, force split it
+                    if len(p) > 4000:
+                        # Simple connection for massive blocks (e.g. code)
+                        for i in range(0, len(p), 4000):
+                            chunks.append(p[i:i+4000])
+                        current_chunk = ""
+                    else:
+                        current_chunk = p + "\n\n"
+            
+            if current_chunk:
+                chunks.append(current_chunk)
+                
+            # Send all chunks
+            for chunk in chunks:
+                if chunk.strip():
+                    await _send_chunk(chunk)
     
     except Exception as e:
         await update.message.reply_text(

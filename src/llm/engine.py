@@ -57,26 +57,16 @@ class LLMEngine:
         model = user_settings.selected_model
         reasoning_effort = user_settings.reasoning_effort if model in REASONING_MODELS else None
         
-        # 3. Attempt Execution with Auto-Downgrade
-        def _try_run(effort):
+        # 3. Execution
+        try:
             return self._responses_backend.generate(
                 model=model,
                 input_messages=messages_responses_fmt,
                 instructions=instructions,
-                reasoning_effort=effort,
+                reasoning_effort=reasoning_effort,
                 enable_web_search=(model in WEB_SEARCH_MODELS)
             )
-
-        try:
-            return _try_run(reasoning_effort)
         except Exception as e:
-            # Handle the specific High > Medium downgrade
-            err_str = str(e).lower()
-            if reasoning_effort == "high" and "reasoning_effort" in err_str and ("unsupported value" in err_str or "unsupported_value" in err_str):
-                print(f"High reasoning rejected. Retrying with medium...")
-                return _try_run("medium") + "\n\n_(Note: Reasoning auto-adjusted to 'medium')_"
-            
-            # Genuine System Error
             return f"System Error: {str(e)}"
     
     def generate_simple(self, prompt: str, model: str = "gpt-4o-mini") -> str:

@@ -73,6 +73,10 @@ def build_settings_keyboard(selected_model: str, reasoning_effort: str) -> Inlin
         # Reasoning level selection (3 buttons in one row)
         reasoning_row = []
         for label, level in REASONING_LEVELS:
+            # Skip "high" for models that don't support it (e.g. gpt-5.2)
+            if level == "high" and selected_model == "gpt-5.2-chat-latest":
+                continue
+                
             text = f"✓ {label}" if level == reasoning_effort else label
             reasoning_row.append(InlineKeyboardButton(text, callback_data=f"reasoning:{level}"))
         
