@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS chat_history (
 CREATE TABLE IF NOT EXISTS conversation_state (
     user_id BIGINT PRIMARY KEY REFERENCES allowed_users(telegram_id) ON DELETE CASCADE,
     pending_image_id TEXT,
+    active_vector_store_id TEXT,
     updated_at TIMESTAMP DEFAULT NOW()
 );
 

@@ -27,6 +27,7 @@ class LLMEngine:
         user_message: str,
         user_settings: UserSettings,
         image_base64: str | None = None,
+        vector_store_id: str | None = None,
     ) -> str:
         """High-level method to generate a response for a user chat session.
         
@@ -64,7 +65,8 @@ class LLMEngine:
                 input_messages=messages_responses_fmt,
                 instructions=instructions,
                 reasoning_effort=reasoning_effort,
-                enable_web_search=(model in WEB_SEARCH_MODELS)
+                enable_web_search=(model in WEB_SEARCH_MODELS),
+                vector_store_id=vector_store_id
             )
         except Exception as e:
             return f"System Error: {str(e)}"

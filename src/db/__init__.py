@@ -12,6 +12,8 @@ from .operations import (
     set_pending_image,
     get_pending_image,
     clear_pending_image,
+    get_active_vector_store,
+    set_active_vector_store,
 )
 
 
@@ -28,4 +30,6 @@ __all__ = [
     "set_pending_image",
     "get_pending_image",
     "clear_pending_image",
+    "get_active_vector_store",
+    "set_active_vector_store",
 ]

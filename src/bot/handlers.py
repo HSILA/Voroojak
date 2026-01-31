@@ -15,7 +15,10 @@ from src.db import (
     set_pending_image,
     get_pending_image,
     clear_pending_image,
+    get_active_vector_store,
+    set_active_vector_store,
 )
+from src.services.file_service import create_vector_store_from_file
 from src.services.openai_service import generate_response
 from src.utils import markdown_to_telegram_html
 
@@ -164,19 +167,28 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         )
     
     elif data == "newchat:confirm":
-        deleted_count = delete_chat_history(user_id)
-        
-        if deleted_count > 0:
+        try:
+            deleted_count = delete_chat_history(user_id)
+            # Clear document context
+            set_active_vector_store(user_id, None)
+            
+            if deleted_count > 0:
+                await query.edit_message_text(
+                    f"✅ <b>History cleared!</b>\n\n"
+                    f"Deleted {deleted_count} message{'s' if deleted_count != 1 else ''}.\n"
+                    f"You can now start a fresh conversation.",
+                    parse_mode="HTML"
+                )
+            else:
+                await query.edit_message_text(
+                    "✨ <b>Fresh start!</b>\n\n"
+                    "No previous history found. You're all set!",
+                    parse_mode="HTML"
+                )
+        except Exception as e:
+            print(f"Error in newchat:confirm: {e}")
             await query.edit_message_text(
-                f"✅ <b>History cleared!</b>\n\n"
-                f"Deleted {deleted_count} message{'s' if deleted_count != 1 else ''}.\n"
-                f"You can now start a fresh conversation.",
-                parse_mode="HTML"
-            )
-        else:
-            await query.edit_message_text(
-                "✨ <b>Fresh start!</b>\n\n"
-                "No previous history found. You're all set!",
+                f"❌ Error clearing history: {e}",
                 parse_mode="HTML"
             )
     
@@ -220,9 +232,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         image_base64 = None
         
         # Check for pending detached image
-        image_base64 = None
-        
-        # Check for pending detached image
         pending_image_id = get_pending_image(user_id)
         if pending_image_id:
             try:
@@ -238,12 +247,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 print(f"Failed to retrieve pending image: {e}")
                 # Log error but continue with text only
         
+        # Check for active file context (vector store)
+        vector_store_id = get_active_vector_store(user_id)
+        
         # Get history BEFORE saving new message to avoid context duplication
         history = get_chat_history(user_id, limit=30)
         
         # Save user message immediately to mark as processed
         # If we attached an image, mark it in the text for history context
         log_content = f"[📷 Attached Image] {user_message}" if image_base64 else user_message
+        if vector_store_id:
+             log_content += " [📄 File Context Active]"
+        
         save_message(user_id, "user", log_content, message_id=message_id, image_data=image_base64)
         
         # Generate AI response (Now in standard Markdown)
@@ -251,7 +266,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             history, 
             user_message, 
             settings, 
-            image_base64=image_base64
+            image_base64=image_base64,
+            vector_store_id=vector_store_id
         )
         
         # Save assistant response
@@ -419,17 +435,56 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
 
 
-async def handle_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle unsupported file types (documents, audio, video, etc.)."""
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle document uploads - specifically PDFs."""
     user_id = update.effective_user.id
     
     if not check_user_access(user_id):
         return
 
-    await update.message.reply_text(
-        "📂 <b>File Format Not Supported</b>\n\n"
-        "I currently only support <b>Images</b> (sent as÷ photos) and <b>Text</b>.\n"
-        "Sending files, documents, or high-quality uncompressed images is not supported yet.\n\n"
-        "Please send your image as a quick photo 🖼️.",
+    document = update.message.document
+    file_name = document.file_name
+    mime_type = document.mime_type
+    
+    # Check if PDF (or update to support more later)
+    if mime_type != "application/pdf":
+         await update.message.reply_text(
+            "📂 <b>Format Not Supported</b>\n\n"
+            "I currently support <b>PDF</b> files for document analysis.\n"
+            "Please upload a PDF document.",
+            parse_mode="HTML"
+        )
+         return
+
+    status_msg = await update.message.reply_text(
+        "⏳ <b>Processing PDF...</b>\n\n"
+        "Uploading and indexing your document. This may take a moment...",
         parse_mode="HTML"
     )
+    
+    try:
+        file = await document.get_file()
+        file_bytes = await file.download_as_bytearray()
+        
+        # Create Vector Store (async)
+        vector_store_id = await create_vector_store_from_file(bytes(file_bytes), file_name)
+        
+        # Update user state
+        set_active_vector_store(user_id, vector_store_id)
+        
+        await context.bot.edit_message_text(
+            chat_id=update.message.chat_id,
+            message_id=status_msg.message_id,
+            text=f"✅ <b>File Ready!</b>\n\n"
+                 f"I've analyzed <code>{file_name}</code>.\n"
+                 f"You can now ask me questions about this document.",
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        await context.bot.edit_message_text(
+             chat_id=update.message.chat_id,
+             message_id=status_msg.message_id,
+             text=f"❌ Error processing file:\n\n<code>{str(e)}</code>",
+             parse_mode="HTML"
+        )

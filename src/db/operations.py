@@ -97,8 +97,20 @@ def set_pending_image(user_id: int, file_id: str) -> None:
     """Set a pending image for the user's conversation state."""
     client = get_supabase_client()
     
-    # Upsert state (insert or update)
+    # Check if row exists to preserve other fields
+    existing = client.table("conversation_state").select("*").eq("user_id", user_id).execute()
+    
     data = {"user_id": user_id, "pending_image_id": file_id, "updated_at": "now()"}
+    
+    # If exists, merge (though upsert with ignore_duplicates=False usually works if we provide all keys, 
+    # but here we might only provide partial updates if we aren't careful. 
+    # To be safe, we just upsert. If active_vector_store_id exists, it might be overwritten if we don't include it.
+    if existing.data:
+        # Preserve existing active_vector_store_id
+        current = existing.data[0]
+        if current.get("active_vector_store_id"):
+            data["active_vector_store_id"] = current["active_vector_store_id"]
+
     client.table("conversation_state").upsert(data).execute()
 
 
@@ -125,25 +137,20 @@ def get_pending_image(user_id: int) -> str | None:
         
     # Check for expiration
     try:
-        # Supabase returns ISO strings like '2023-10-27T10:00:00+0000' or '2023-10-27T10:00:00'
-        # We handle standard ISO format replacement Z -> +00:00 just in case
+        # Supabase returns ISO strings
         updated_at = datetime.fromisoformat(updated_at_str.replace('Z', '+00:00'))
         
-        # Fix: Ensure updated_at is timezone-aware (UTC) if it comes back naive
         if updated_at.tzinfo is None:
             updated_at = updated_at.replace(tzinfo=timezone.utc)
         
-        # Ensure we compare timezone-aware datetimes
         time_diff = datetime.now(timezone.utc) - updated_at
         
         if time_diff > timedelta(minutes=PENDING_IMAGE_TIMEOUT_MINUTES):
-            # Too old! Clean it up and return None
+            # Too old! Clean it up
             clear_pending_image(user_id)
             return None
             
     except ValueError:
-        # If date parsing fails, assume valid (or safe fail to None)?
-        # Let's fail safe -> return None to avoid weird bugs
         return None
         
     return pending_id
@@ -152,7 +159,38 @@ def get_pending_image(user_id: int) -> str | None:
 def clear_pending_image(user_id: int) -> None:
     """Clear the pending image state."""
     client = get_supabase_client()
-    client.table("conversation_state").delete().eq("user_id", user_id).execute()
+    # Update to None instead of delete to preserve vector_store_id
+    client.table("conversation_state").update({"pending_image_id": None}).eq("user_id", user_id).execute()
+
+
+def set_active_vector_store(user_id: int, vector_store_id: str | None) -> None:
+    """Set the active vector store for the user."""
+    client = get_supabase_client()
+    
+    # Fetch existing to preserve pending_image_id
+    existing = client.table("conversation_state").select("*").eq("user_id", user_id).execute()
+    data = {"user_id": user_id, "active_vector_store_id": vector_store_id, "updated_at": "now()"}
+    
+    if existing.data:
+        current = existing.data[0]
+        if current.get("pending_image_id"):
+            data["pending_image_id"] = current["pending_image_id"]
+            
+    client.table("conversation_state").upsert(data).execute()
+
+
+def get_active_vector_store(user_id: int) -> str | None:
+    """Get the active vector store ID."""
+    client = get_supabase_client()
+    response = (
+        client.table("conversation_state")
+        .select("active_vector_store_id")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if response.data and response.data[0].get("active_vector_store_id"):
+        return response.data[0]["active_vector_store_id"]
+    return None
 
 
 def get_chat_history(user_id: int, limit: int = 30) -> ChatHistory:

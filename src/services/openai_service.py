@@ -14,6 +14,7 @@ def generate_response(
     user_message: str,
     user_settings: UserSettings,
     image_base64: str | None = None,
+    vector_store_id: str | None = None,
 ) -> str:
     """Generate a response using the centralized LLM Engine.
     
@@ -22,6 +23,7 @@ def generate_response(
         user_message: New message from the user.
         user_settings: User's model and reasoning preferences.
         image_base64: Optional base64-encoded image data.
+        vector_store_id: Optional vector store for file search.
         
     Returns:
         Generated response text.
@@ -30,5 +32,6 @@ def generate_response(
         history=history,
         user_message=user_message,
         user_settings=user_settings,
-        image_base64=image_base64
+        image_base64=image_base64,
+        vector_store_id=vector_store_id
     )

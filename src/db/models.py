@@ -27,6 +27,7 @@ class ConversationState(BaseModel):
     
     user_id: int
     pending_image_id: str | None = None
+    active_vector_store_id: str | None = None
     updated_at: datetime | None = None
 
 
